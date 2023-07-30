@@ -1,13 +1,12 @@
 from rest_framework.response import Response
-from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status, mixins
+from rest_framework import status, mixins, generics
 from todo.models import Task
 from todo.serializers import TaskSerializer
 from .permissions import IsOwner
 
 
-class TaskListView(GenericAPIView, mixins.ListModelMixin):
+class TaskListView(generics.ListAPIView):
     serializer_class = TaskSerializer
     queryset = Task.objects.filter()
     permission_classes = (IsAuthenticated, )
@@ -15,11 +14,8 @@ class TaskListView(GenericAPIView, mixins.ListModelMixin):
     def get_queryset(self):
         return super().get_queryset().filter(owner=self.request.user)
 
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
 
-
-class TaskCreateView(GenericAPIView, mixins.CreateModelMixin):
+class TaskCreateView(generics.CreateAPIView):
     serializer_class = TaskSerializer
     queryset = Task.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -32,31 +28,19 @@ class TaskCreateView(GenericAPIView, mixins.CreateModelMixin):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class TaskDetailView(GenericAPIView, mixins.RetrieveModelMixin):
+class TaskDetailView(generics.RetrieveAPIView):
     serializer_class = TaskSerializer
     queryset = Task.objects.all()
     permission_classes = (IsAuthenticated, IsOwner)
 
 
-    def get(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
-        
-
-class TaskUpdateView(GenericAPIView, mixins.UpdateModelMixin):
+class TaskUpdateView(generics.UpdateAPIView):
     serializer_class = TaskSerializer
     queryset = Task.objects.all()
     permission_classes = (IsAuthenticated, IsOwner) 
     
-    
-    def put(self, request, *args, **kwargs):
-        return self.update(request, *args, **kwargs)
 
-
-class TaskDeleteView(GenericAPIView, mixins.DestroyModelMixin):
+class TaskDeleteView(generics.DestroyAPIView):
     serializer_class = TaskSerializer
     queryset = Task.objects.all()
     permission_classes = (IsAuthenticated, IsOwner) 
-    
-    
-    def delete(self, request, *args, **kwargs):
-        return self.destroy(request, *args, **kwargs)
