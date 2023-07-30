@@ -1,58 +1,74 @@
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from todo.models import Task
 from todo.serializers import TaskSerializer
+from .permissions import IsOwner
 
 
-@api_view(['GET'])
-def task_list_view(request):
-    current_user = request.user
-    if current_user.is_authenticated:
-        user_tasks = Task.objects.filter(owner=request.user)
-        serializer = TaskSerializer(user_tasks, many=True)
+class TaskListView(APIView):
+    permission_classes = (IsAuthenticated, )
+
+
+    def get(self, request):
+        user = request.user
+        tasks = Task.objects.filter(owner=user)
+        serializer = TaskSerializer(tasks, many=True)
         return Response(serializer.data)
-    else:
-        return Response({}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class TaskCreateView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+
+    def post(self, request):
+        serializer = TaskSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(owner=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TaskDetailView(APIView):
+    permission_classes = (IsAuthenticated, IsOwner)
+
+
+    def get(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+            serializer = TaskSerializer(task)
+            return Response(serializer.data)
+        except:
+            return Response('Not found', status=status.HTTP_404_NOT_FOUND)
+        
+
+class TaskUpdateView(APIView):
+    permission_classes = (IsAuthenticated, IsOwner) 
     
-
-@api_view(['GET', 'PUT', 'DELETE'])    
-def task_detail_view(request, pk):
-    try:
-        task = Task.objects.get(pk=pk)
-    except:
-        return Response({'Not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    current_user = request.user
-    if not current_user.is_authenticated:
-        return Response({}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if request.method == 'GET':
-        if task.owner != current_user:
-            return Response({'No permission'}, status=status.HTTP_403_FORBIDDEN)
-        serializer = TaskSerializer(task)
-        return Response(serializer.data)
-
-    elif request.method == 'PUT':
-        serializer = TaskSerializer(data=request.data, instance=task)
+    
+    def put(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+        except:
+            return Response('Not found', status=status.HTTP_404_NOT_FOUND)
+        serializer = TaskSerializer(task, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    elif request.method == 'DELETE':
+
+class TaskDeleteView(APIView):
+    permission_classes = (IsAuthenticated, IsOwner)
+  
+  
+    def delete(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+        except:
+            return Response('Not found', status=status.HTTP_404_NOT_FOUND)
         task.delete()
-        return Response({'Deleted successfully'})
-
-
-@api_view(['POST'])
-def task_create_view(request):
-    current_user = request.user
-    if current_user.is_authenticated:
-        serializer = TaskSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(owner=current_user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-    else:
-        return Response({}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response('Deleted successfully')
