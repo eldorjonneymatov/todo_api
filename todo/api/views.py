@@ -1,74 +1,62 @@
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
+from rest_framework import status, mixins
 from todo.models import Task
 from todo.serializers import TaskSerializer
 from .permissions import IsOwner
 
 
-class TaskListView(APIView):
+class TaskListView(GenericAPIView, mixins.ListModelMixin):
+    serializer_class = TaskSerializer
+    queryset = Task.objects.filter()
     permission_classes = (IsAuthenticated, )
 
+    def get_queryset(self):
+        return super().get_queryset().filter(owner=self.request.user)
 
-    def get(self, request):
-        user = request.user
-        tasks = Task.objects.filter(owner=user)
-        serializer = TaskSerializer(tasks, many=True)
-        return Response(serializer.data)
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
 
-class TaskCreateView(APIView):
+class TaskCreateView(GenericAPIView, mixins.CreateModelMixin):
+    serializer_class = TaskSerializer
+    queryset = Task.objects.all()
     permission_classes = (IsAuthenticated,)
 
 
-    def post(self, request):
-        serializer = TaskSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(owner=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(owner=self.request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class TaskDetailView(APIView):
+class TaskDetailView(GenericAPIView, mixins.RetrieveModelMixin):
+    serializer_class = TaskSerializer
+    queryset = Task.objects.all()
     permission_classes = (IsAuthenticated, IsOwner)
 
 
-    def get(self, request, pk):
-        try:
-            task = Task.objects.get(pk=pk)
-            serializer = TaskSerializer(task)
-            return Response(serializer.data)
-        except:
-            return Response('Not found', status=status.HTTP_404_NOT_FOUND)
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
         
 
-class TaskUpdateView(APIView):
+class TaskUpdateView(GenericAPIView, mixins.UpdateModelMixin):
+    serializer_class = TaskSerializer
+    queryset = Task.objects.all()
     permission_classes = (IsAuthenticated, IsOwner) 
     
     
-    def put(self, request, pk):
-        try:
-            task = Task.objects.get(pk=pk)
-        except:
-            return Response('Not found', status=status.HTTP_404_NOT_FOUND)
-        serializer = TaskSerializer(task, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
 
 
-class TaskDeleteView(APIView):
-    permission_classes = (IsAuthenticated, IsOwner)
-  
-  
-    def delete(self, request, pk):
-        try:
-            task = Task.objects.get(pk=pk)
-        except:
-            return Response('Not found', status=status.HTTP_404_NOT_FOUND)
-        task.delete()
-        return Response('Deleted successfully')
+class TaskDeleteView(GenericAPIView, mixins.DestroyModelMixin):
+    serializer_class = TaskSerializer
+    queryset = Task.objects.all()
+    permission_classes = (IsAuthenticated, IsOwner) 
+    
+    
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
